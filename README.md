@@ -2,7 +2,7 @@
 
 The U.S. Bureau of Labor Statistics's data warehouse. Employment, unemployment, wages, prices (CPI/PPI), productivity, occupational projections — the official US labor and price data. National, state, and metro level. Free with a registered API key.
 
-Part of [Pipeworx](https://pipeworx.io) — an MCP gateway connecting AI agents to 1476+ live data sources.
+Part of [Pipeworx](https://pipeworx.io) — an MCP gateway connecting AI agents to 1504+ live data sources.
 
 ## Why this matters for AI agents
 
@@ -15,6 +15,15 @@ Three core flows:
 **2. Latest value.** "What's national unemployment right now?" → `bls_latest({series_id: "LNS14000000"})` → most recent observation.
 
 **3. Browse popular series.** "What does BLS publish?" → `bls_popular_series` → curated list of high-traffic IDs.
+
+**4. Local-area unemployment by place name.** "What's the unemployment rate in Wake County, NC?" or "Cary, North Carolina" or "Fargo-Moorhead MSA" → `bls_local_unemployment({place, state?})`. This is the tool for LAUS (Local Area Unemployment Statistics) lookups by county / metro area / city — `bls_search`'s curated catalog has no local-area entries, and constructing a LAUS series ID by hand requires a place → BLS area-code crosswalk (~8,000 US counties/metros/cities) that isn't something to guess at. `bls_local_unemployment` resolves the name against that crosswalk itself (bundled from BLS's `la.area` reference file), returns candidates when the name is ambiguous, and falls back to the county — saying so explicitly — when a city is below the LAUS city-reporting threshold.
+
+## Reading the response
+
+`bls_get_series` returns each series **newest first** — the payload says so in
+`observation_order`, so you don't have to infer the direction from the dates.
+`count` is the number of points for that series, and BLS returns every point in
+the requested year range, so it is never a total sitting beside a shorter list.
 
 ## Auth
 
@@ -32,7 +41,10 @@ BLS series IDs encode survey, area, sector, and data type. Examples:
 | `LAUMT080000000000003` | Denver MSA unemployment rate |
 | `WPSFD49207` | PPI for finished goods |
 
-Don't try to construct IDs from scratch — use `bls_search` or `bls_popular_series`.
+Don't try to construct national/state/industry IDs from scratch — use `bls_search` or
+`bls_popular_series`. For LAUS local-area IDs (county/MSA/city) specifically, use
+`bls_local_unemployment({place, state?})` — it resolves the place name to the correct
+area code for you.
 
 ## Update cadence
 
@@ -97,7 +109,7 @@ directly, instead of just this one's:
 }
 ```
 
-Both URLs reach the same gateway and the same 1476+ data sources. The
+Both URLs reach the same gateway and the same 1504+ data sources. The
 only difference is which pack's tools are listed **directly**; `ask_pipeworx`
 reaches all of them from either one.
 

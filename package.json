@@ -1,6 +1,6 @@
 {
   "name": "@pipeworx/mcp-bls",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "BLS MCP — Bureau of Labor Statistics public data API (v2)",
   "type": "module",
   "main": "src/index.ts",
@@ -9,7 +9,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pipeworx-io/mcp-bls"
+    "url": "git+https://github.com/pipeworx-io/mcp-bls.git"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
