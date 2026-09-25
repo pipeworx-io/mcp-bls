@@ -1,6 +1,6 @@
 {
   "name": "@pipeworx/mcp-bls",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "BLS MCP — Bureau of Labor Statistics public data API (v2)",
   "type": "module",
   "main": "src/index.ts",
@@ -26,7 +26,7 @@
     "@cloudflare/workers-types": "^4.20260405.1"
   },
   "pipeworx": {
-    "sourceHash": "v1-30fbf861e5410f9b052fd66edf1b995a4546e0c687cb5113a67f3cf31ec2098a",
-    "sourceCommit": "60f04b68c347e970c6be94a53439d1364061fc06"
+    "sourceHash": "v1-803d22f256a38a57f7b28f86b516e8004aecd30805c6f5ba783e982ae92e77ab",
+    "sourceCommit": "babdd280d475dceddecc9ebf8f2a661712781a81"
   }
 }
