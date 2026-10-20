@@ -3,7 +3,7 @@
   "name": "io.github.pipeworx-io/bls",
   "title": "Bls",
   "description": "BLS MCP — Bureau of Labor Statistics public data API (v2)",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "websiteUrl": "https://pipeworx.io/packs/bls",
   "repository": {
     "url": "https://github.com/pipeworx-io/mcp-bls",
