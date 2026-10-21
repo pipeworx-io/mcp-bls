@@ -2,7 +2,7 @@
 
 The U.S. Bureau of Labor Statistics's data warehouse. Employment, unemployment, wages, prices (CPI/PPI), productivity, occupational projections — the official US labor and price data. National, state, and metro level. Free with a registered API key.
 
-Part of [Pipeworx](https://pipeworx.io) — an MCP gateway connecting AI agents to 1851+ live data sources. This is an independent, unofficial integration — not affiliated with, endorsed by, or published by the upstream provider.
+Part of [Pipeworx](https://pipeworx.io) — an MCP gateway connecting AI agents to 1855+ live data sources. This is an independent, unofficial integration — not affiliated with, endorsed by, or published by the upstream provider.
 
 ## Why this matters for AI agents
 
@@ -15,6 +15,8 @@ Three core flows:
 **2. Latest value.** "What's national unemployment right now?" → `bls_latest({series_id: "LNS14000000"})` → most recent observation.
 
 **3. Browse popular series.** "What does BLS publish?" → `bls_popular_series` → curated list of high-traffic IDs.
+
+**Employment Projections.** "Projected growth and annual openings for software developers" → `bls_occupation_projections({ soc_code: "15-1252" })`, or `({ query: "nurse" })`, or rank occupations with `({ rank_by: "growth_percent", min_employment_thousands: 50 })`. Serves the latest release's national employment matrix (employment, 10-year change, annual openings, median wage, typical entry education); employment and openings are in thousands, and the response carries the projection period and `data_as_of`. Earlier vintages are not served.
 
 **4. Local-area unemployment by place name.** "What's the unemployment rate in Wake County, NC?" or "Cary, North Carolina" or "Fargo-Moorhead MSA" → `bls_local_unemployment({place, state?})`. This is the tool for LAUS (Local Area Unemployment Statistics) lookups by county / metro area / city — `bls_search`'s curated catalog has no local-area entries, and constructing a LAUS series ID by hand requires a place → BLS area-code crosswalk (~8,000 US counties/metros/cities) that isn't something to guess at. `bls_local_unemployment` resolves the name against that crosswalk itself (bundled from BLS's `la.area` reference file), returns candidates when the name is ambiguous, and falls back to the county — saying so explicitly — when a city is below the LAUS city-reporting threshold.
 
@@ -109,7 +111,7 @@ directly, instead of just this one's:
 }
 ```
 
-Both URLs reach the same gateway and the same 1851+ data sources. The
+Both URLs reach the same gateway and the same 1855+ data sources. The
 only difference is which pack's tools are listed **directly**; `ask_pipeworx`
 reaches all of them from either one.
 

@@ -931,6 +931,7 @@ async function parseJsonBounded<T>(
  * - bls_popular_series: list popular housing & employment series with descriptions
  */
 
+import { parseXlsx } from './xlsx.js';
 
 // Bound every fetch() in this pack to a fixed timeout — an upstream that
 // degrades without erroring would otherwise hold the Worker in `await fetch()`
@@ -9251,6 +9252,22 @@ const tools: McpToolExport['tools'] = [
       required: ['place'],
     },
   },
+  {
+    name: 'bls_occupation_projections',
+    description:
+      'Official US Employment Projections by occupation (SOC code): projected 10-year employment growth (number and percent), annual average job openings, current employment, median annual wage, and typical entry education, experience and training, from the Bureau of Labor Statistics, Employment Projections program. Look up an occupation by SOC code ("15-1252") or title words ("software developers"), or rank all detailed occupations by growth, openings or wage. Answers "projected growth for registered nurses", "which occupations have the most annual openings", "fastest growing jobs". Employment and openings are in thousands. Always reports the projection vintage (base and target year) of the latest release.',
+    inputSchema: {
+      type: 'object' as const,
+      properties: {
+        soc_code: { type: 'string', description: 'SOC code, e.g. "15-1252" (detailed), "15-1200" or "15-0000" (summary/major group).' },
+        query: { type: 'string', description: 'Words from the occupation title, e.g. "nurse practitioners". Matches every word.' },
+        rank_by: { type: 'string', enum: ['growth_percent', 'growth_numeric', 'openings', 'wage', 'employment'], description: 'Instead of a lookup, rank detailed occupations by this measure, highest first (default listing when neither soc_code nor query is given: openings).' },
+        direction: { type: 'string', enum: ['highest', 'lowest'], description: 'With rank_by or a query list: highest (default) or lowest first, e.g. fastest declining.' },
+        min_employment_thousands: { type: 'number', description: 'For rankings: ignore occupations employing fewer than this many thousand workers (default 0).' },
+        limit: { type: 'number', description: 'Max occupations returned (default 10, max 50).' },
+      },
+    },
+  },
 ];
 
 // ── callTool dispatcher ─────────────────────────────────────────────────
@@ -9267,9 +9284,168 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<un
       return listPopularSeries(args.category as string | undefined);
     case 'bls_local_unemployment':
       return getLocalUnemployment(args);
+    case 'bls_occupation_projections':
+      return occupationProjections(args);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
+}
+
+// ── Employment Projections (Table 1.2) ──────────────────────────────────
+
+const EP_URL = 'https://www.bls.gov/emp/ind-occ-matrix/occupation.xlsx';
+const EP_UA = 'Pipeworx/1.0 (+https://pipeworx.io; contact: hello@pipeworx.io)';
+const EP_SOURCE = 'U.S. Bureau of Labor Statistics, Employment Projections program (national employment matrix)';
+const EP_REFRESH_MS = 12 * 60 * 60 * 1000;
+
+interface EpOccupation {
+  soc_code: string;
+  title: string;
+  level: 'summary' | 'detailed';
+  employment_base_thousands: number | null;
+  employment_projected_thousands: number | null;
+  change_numeric_thousands: number | null;
+  change_percent: number | null;
+  annual_openings_thousands: number | null;
+  percent_self_employed: number | null;
+  median_annual_wage: number | null;
+  typical_entry_education: string | null;
+  work_experience: string | null;
+  on_the_job_training: string | null;
+}
+interface EpTable {
+  occupations: EpOccupation[];
+  base_year: number | null;
+  projected_year: number | null;
+  data_as_of: string | null;
+  title: string;
+}
+
+let epCache: { at: number; table: EpTable } | null = null;
+let epInflight: Promise<EpTable> | null = null;
+
+function epNum(v: unknown): number | null {
+  if (typeof v === 'number' && Number.isFinite(v)) return Math.round(v * 100) / 100;
+  return null;
+}
+function epText(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  return !t || t === '—' ? null : t;
+}
+
+async function loadEp(): Promise<EpTable> {
+  const res = await pwFetch(EP_URL, { headers: { 'User-Agent': EP_UA, Accept: '*/*' } });
+  if (!res.ok) throw new Error(`BLS Employment Projections returned HTTP ${res.status}`);
+  const wb = await parseXlsx(new Uint8Array(await res.arrayBuffer()));
+  const sheet = wb.sheets.find((sh) => /^Table 1\.2\b/.test(sh.name));
+  if (!sheet) throw new Error('BLS Employment Projections workbook changed shape: no "Table 1.2" sheet');
+  const title = String(sheet.rows.get(1)?.get('A') ?? '');
+  const hdr = sheet.rows.get(2);
+  const hd = (c: string) => String(hdr?.get(c) ?? '');
+  if (!/Employment, \d{4}/.test(hd('D')) || !/openings/i.test(hd('K')) || !/Median annual wage/i.test(hd('L'))) {
+    throw new Error(`BLS Employment Projections table layout changed: columns D/K/L read "${hd('D')}" / "${hd('K')}" / "${hd('L')}"`);
+  }
+  const base = /Employment, (\d{4})/.exec(hd('D'));
+  const proj = /Employment, (\d{4})/.exec(hd('E'));
+  const occupations: EpOccupation[] = [];
+  for (const [rowNum, c] of [...sheet.rows.entries()].sort((a, b) => a[0] - b[0])) {
+    if (rowNum < 3) continue;
+    const code = typeof c.get('B') === 'string' ? (c.get('B') as string).trim() : '';
+    if (!/^\d\d-\d{4}$/.test(code)) continue;
+    const type = String(c.get('C') ?? '');
+    occupations.push({
+      soc_code: code,
+      title: String(c.get('A') ?? '').trim(),
+      level: type === 'Line item' ? 'detailed' : 'summary',
+      employment_base_thousands: epNum(c.get('D')),
+      employment_projected_thousands: epNum(c.get('E')),
+      change_numeric_thousands: epNum(c.get('H')),
+      change_percent: epNum(c.get('I')),
+      annual_openings_thousands: epNum(c.get('K')),
+      percent_self_employed: epNum(c.get('J')),
+      median_annual_wage: epNum(c.get('L')),
+      typical_entry_education: epText(c.get('M')),
+      work_experience: epText(c.get('N')),
+      on_the_job_training: epText(c.get('O')),
+    });
+  }
+  if (occupations.length < 500) {
+    throw new Error(`BLS Employment Projections parsed to only ${occupations.length} occupations; expected ~1,000 — refusing to answer from a partial table`);
+  }
+  const lm = res.headers.get('last-modified');
+  return {
+    occupations,
+    base_year: base ? Number(base[1]) : null,
+    projected_year: proj ? Number(proj[1]) : null,
+    data_as_of: lm ? new Date(lm).toISOString().slice(0, 10) : null,
+    title,
+  };
+}
+
+async function getEp(): Promise<EpTable> {
+  if (epCache && Date.now() - epCache.at < EP_REFRESH_MS) return epCache.table;
+  if (!epInflight) {
+    epInflight = loadEp().then((t) => { epCache = { at: Date.now(), table: t }; return t; }).finally(() => { epInflight = null; });
+  }
+  return epInflight;
+}
+
+async function occupationProjections(args: Record<string, unknown>) {
+  const soc = typeof args.soc_code === 'string' ? args.soc_code.trim() : '';
+  const q = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
+  const rankBy = typeof args.rank_by === 'string' ? args.rank_by : '';
+  const lowest = args.direction === 'lowest';
+  const minEmp = Number(args.min_employment_thousands) > 0 ? Number(args.min_employment_thousands) : 0;
+  const n = Number(args.limit);
+  const limit = Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 50) : 10;
+  const t = await getEp();
+  const vintage = t.base_year && t.projected_year ? `${t.base_year}-${String(t.projected_year).slice(2)}` : null;
+  const envelope = {
+    source: EP_SOURCE,
+    projection_period: vintage,
+    base_year: t.base_year,
+    projected_year: t.projected_year,
+    units: 'Employment and annual openings in thousands of jobs; wage in dollars (median annual, base year); growth percent over the whole projection period, not per year.',
+    data_as_of: t.data_as_of,
+    note: 'Latest release only. Earlier projection vintages (e.g. 2024-34) are superseded and not served.',
+  };
+  if (soc && !/^\d\d-\d{4}$/.test(soc)) throw new Error('soc_code must look like "15-1252" (two digits, dash, four digits)');
+  const measure = (o: EpOccupation): number | null => {
+    switch (rankBy || 'annual_openings') {
+      case 'growth_percent': return o.change_percent;
+      case 'growth_numeric': return o.change_numeric_thousands;
+      case 'wage': return o.median_annual_wage;
+      case 'employment': return o.employment_base_thousands;
+      default: return o.annual_openings_thousands;
+    }
+  };
+  let pool: EpOccupation[];
+  if (soc) {
+    pool = t.occupations.filter((o) => o.soc_code === soc);
+    if (!pool.length) {
+      const prefix = soc.slice(0, 2);
+      return { ...envelope, found: false, reason: 'unknown_soc_code', soc_code: soc, hint: `No occupation or group has SOC code ${soc} in the national employment matrix. Codes in major group ${prefix}: ${t.occupations.filter((o) => o.soc_code.startsWith(prefix + '-')).slice(0, 8).map((o) => o.soc_code).join(', ') || 'none'}…; or search by title with query.` };
+    }
+  } else if (q) {
+    const words = q.split(/\s+/).filter(Boolean);
+    pool = t.occupations.filter((o) => words.every((w) => o.title.toLowerCase().includes(w)));
+    if (!pool.length) return { ...envelope, found: false, reason: 'no_title_match', query: q, hint: 'No occupation title contains every word. Try fewer or singular words (e.g. "nurse"), or look up by soc_code.' };
+    if (rankBy) pool = pool.filter((o) => measure(o) !== null).sort((a, b) => (lowest ? 1 : -1) * ((measure(a) ?? 0) - (measure(b) ?? 0)));
+  } else {
+    pool = t.occupations.filter((o) => o.level === 'detailed' && (o.employment_base_thousands ?? 0) >= minEmp && measure(o) !== null)
+      .sort((a, b) => (lowest ? 1 : -1) * ((measure(a) ?? 0) - (measure(b) ?? 0)));
+  }
+  return {
+    ...envelope,
+    found: true,
+    ...(soc ? { soc_code: soc } : {}),
+    ...(q ? { query: q } : {}),
+    ...(!soc && !q ? { ranked_by: rankBy || 'openings', direction: lowest ? 'lowest' : 'highest', min_employment_thousands: minEmp } : {}),
+    total_matches: pool.length,
+    truncated: pool.length > limit,
+    occupations: pool.slice(0, limit),
+  };
 }
 
 // ── Tool implementations ────────────────────────────────────────────────

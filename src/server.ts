@@ -10,7 +10,7 @@ import pack from './index.js';
 
 
 const server = new Server(
-  { name: '@pipeworx/mcp-bls', version: '0.2.3' },
+  { name: '@pipeworx/mcp-bls', version: '0.2.4' },
   { capabilities: { tools: {} } },
 );
 
