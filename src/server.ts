@@ -7,10 +7,11 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import pack from './index.js';
-
+import * as bakedIndexModule from './laus-area-data.js';
+const bakedIndex = Object.fromEntries(Object.entries(bakedIndexModule));
 
 const server = new Server(
-  { name: '@pipeworx/mcp-bls', version: '0.2.5' },
+  { name: '@pipeworx/mcp-bls', version: '0.2.6' },
   { capabilities: { tools: {} } },
 );
 
@@ -26,7 +27,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   try {
     const callArgs = { ...((args ?? {}) as Record<string, unknown>) };
-    
+    callArgs._bakedIndex = bakedIndex;
     const result = await pack.callTool(name, callArgs);
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
   } catch (err) {
