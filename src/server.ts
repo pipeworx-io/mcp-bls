@@ -11,7 +11,7 @@ import * as bakedIndexModule from './laus-area-data.js';
 const bakedIndex = Object.fromEntries(Object.entries(bakedIndexModule));
 
 const server = new Server(
-  { name: '@pipeworx/mcp-bls', version: '0.2.6' },
+  { name: '@pipeworx/mcp-bls', version: '0.2.7' },
   { capabilities: { tools: {} } },
 );
 

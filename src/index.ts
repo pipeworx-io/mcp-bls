@@ -1023,7 +1023,7 @@ const tools: McpToolExport['tools'] = [
   {
     name: 'bls_get_series',
     description:
-      'Fetch historical time series data for employment, inflation, wages, productivity, or housing. Returns dated data points with values. Provide series ID (e.g., "PAYEMS" for total nonfarm employment).',
+      'Fetch historical time series data for employment, inflation, wages, productivity, or housing. Returns dated data points with values. Provide a BLS series ID (e.g., "CES0000000001" for total nonfarm payroll employment, the headline Employment Situation jobs number; "LNS14000000" for the unemployment rate). "PAYEMS" is the FRED id for the same series, not a BLS id.',
     inputSchema: {
       type: 'object' as const,
       properties: {
