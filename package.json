@@ -1,12 +1,20 @@
 {
   "name": "@pipeworx/mcp-bls",
-  "version": "0.2.7",
+  "version": "0.3.0",
   "description": "BLS MCP — Bureau of Labor Statistics public data API (v2)",
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./tools.json": "./tools.json",
+    "./package.json": "./package.json"
+  },
   "bin": {
     "mcp-bls": "bin/cli.js"
+  },
+  "files": ["bin/", "lib/", "tools.json", "server.json"],
+  "engines": {
+    "node": ">=18"
   },
   "keywords": ["mcp", "mcp-server", "model-context-protocol", "pipeworx", "bls"],
   "license": "MIT",
@@ -14,19 +22,12 @@
     "type": "git",
     "url": "git+https://github.com/pipeworx-io/mcp-bls.git"
   },
-  "scripts": {
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
-    "tsx": "^4.19.0"
-  },
-  "devDependencies": {
-    "typescript": "^5.9.3",
-    "@cloudflare/workers-types": "^4.20260405.1"
-  },
+  "mcpName": "io.github.pipeworx-io/bls",
   "pipeworx": {
-    "sourceHash": "v1-365e83e174357b33645e5cba1e4ffd1ab8534c8a8cb766234a8afe40a95a8963",
-    "sourceCommit": "ba9dd6df5992aeb16ef2425ee86d1752c34ca636"
+    "mode": "gateway",
+    "slug": "bls",
+    "gatewaySlug": "bls",
+    "sourceHash": "v1-679b46a23790a52e89efffae2ef0369cac700de244502debf52eb468c4e47306",
+    "sourceCommit": "4277282d72f9bf55e548b3799aaf737baf22152f"
   }
 }
